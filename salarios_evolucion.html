@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evolución de Salarios Reales – Mendoza 1895–1986</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #ffffff;
+    color: #222;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.45rem;
+    font-weight: normal;
+    color: #1a1a2e;
+    text-align: center;
+    margin-bottom: 6px;
+    line-height: 1.35;
+  }
+  .subtitle {
+    font-size: 0.82rem;
+    color: #888;
+    text-align: center;
+    margin-bottom: 20px;
+    font-style: italic;
+  }
+  .chart-wrap {
+    width: 100%;
+    max-width: 880px;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    padding: 20px 20px 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  canvas { display: block; width: 100% !important; }
+
+  /* Controls */
+  .controls {
+    width: 100%;
+    max-width: 880px;
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  button {
+    padding: 8px 20px;
+    border: 1.5px solid #bbb;
+    border-radius: 4px;
+    background: #fff;
+    font-family: Arial, sans-serif;
+    font-size: 0.88rem;
+    cursor: pointer;
+    color: #333;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  button:hover { background: #f0f0f0; border-color: #999; }
+  button.active { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+
+  .speed-label { font-size: 0.82rem; color: #888; margin-left: 8px; }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .slider-row label {
+    font-size: 0.85rem;
+    color: #555;
+    white-space: nowrap;
+    min-width: 52px;
+  }
+  input[type=range] {
+    flex: 1;
+    accent-color: #1a1a2e;
+    height: 4px;
+    cursor: pointer;
+  }
+  .year-display {
+    font-family: Georgia, serif;
+    font-size: 1.05rem;
+    font-weight: bold;
+    color: #1a1a2e;
+    min-width: 44px;
+    text-align: right;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 14px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.83rem;
+    color: #444;
+    cursor: pointer;
+    user-select: none;
+  }
+  .legend-item .swatch {
+    width: 28px;
+    height: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .legend-item.dashed .swatch {
+    background: repeating-linear-gradient(
+      90deg,
+      #2980B9 0px, #2980B9 6px,
+      transparent 6px, transparent 10px
+    );
+  }
+  .legend-item.faded { opacity: 0.35; }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    background: rgba(255,255,255,0.97);
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 9px 13px;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    pointer-events: none;
+    display: none;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+    z-index: 999;
+    min-width: 180px;
+  }
+  .tooltip strong { font-family: Georgia, serif; font-size: 0.9rem; }
+
+  /* Sources */
+  .sources {
+    margin-top: 18px;
+    font-size: 0.76rem;
+    color: #999;
+    text-align: center;
+    max-width: 880px;
+    line-height: 1.6;
+  }
+  .sources em { font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>Evolución de salarios reales en Mendoza, 1895–1986</h1>
+<p class="subtitle">Salarios reales deflactados — datos anuales con gaps por ausencia de fuente</p>
+
+<div class="chart-wrap">
+  <canvas id="chart" height="380"></canvas>
+</div>
+
+<div class="controls">
+  <div class="btn-row">
+    <button id="btnPlay" class="active">▶ Reproducir</button>
+    <button id="btnReset">⟳ Reiniciar</button>
+    <span class="speed-label">Velocidad:</span>
+    <button id="sp1" class="active">1×</button>
+    <button id="sp2">2×</button>
+    <button id="sp4">4×</button>
+  </div>
+  <div class="slider-row">
+    <label>Año:</label>
+    <input type="range" id="slider" min="0" max="44" step="1" value="0">
+    <span class="year-display" id="yearLabel">1895</span>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item" id="leg-pb" onclick="toggleSeries('pb')">
+    <div class="swatch" style="background:#C0392B;height:3px;"></div>
+    Peón de bodega / Obrero vinícola <small style="color:#999;margin-left:3px;">($ ley 18188)</small>
+  </div>
+  <div class="legend-item" id="leg-pv" onclick="toggleSeries('pv')">
+    <div class="swatch" style="background:#27AE60;height:3px;"></div>
+    Peón de viña <small style="color:#999;margin-left:3px;">($ ley 18188)</small>
+  </div>
+  <div class="legend-item dashed" id="leg-si" onclick="toggleSeries('si')">
+    <div class="swatch"></div>
+    Salario industrial — Ferreres <small style="color:#999;margin-left:3px;">($ de 2004, eje der.)</small>
+  </div>
+</div>
+
+<p class="sources">
+  <strong>Fuentes:</strong>
+  1) <em>Salarios varones y mujeres 1895–1986 — Olguín, JHE 2025</em>: salarios nominal y real peón de viña y obrero vinícola, hojas SN 1895–1945, SR selecc 1895–1945, Sal nom y real 1952–1986. &nbsp;
+  2) Salario industrial (Capital Federal): <em>Base de datos Ferreres</em> (extraída del mismo archivo, hoja «Salario ind», columna 11).
+  <br>Los gaps en las series mendocinas reflejan ausencia de fuente, no interpolación.
+</p>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ── DATOS ─────────────────────────────────────────────────────────────────────
+const RAW_DATA = {"1895": {"pb": null, "si": 471.87, "pv": null}, "1910": {"pb": null, "si": 645.52, "pv": null}, "1914": {"pb": null, "si": 754.72, "pv": 25.07}, "1915": {"pb": 21.95, "si": 677.54, "pv": 16.46}, "1916": {"pb": 20.44, "si": 632.51, "pv": 15.33}, "1923": {"pb": null, "si": 955.52, "pv": null}, "1928": {"pb": 41.83, "si": 1083.54, "pv": null}, "1932": {"pb": 51.88, "si": 1155.75, "pv": null}, "1933": {"pb": 43.69, "si": 1068.23, "pv": null}, "1945": {"pb": null, "si": 1211.69, "pv": null}, "1952": {"pb": 75.26, "si": 1446.55, "pv": 45.11}, "1953": {"pb": 59.08, "si": 1513.04, "pv": 35.41}, "1954": {"pb": 67.78, "si": 1668.82, "pv": 43.36}, "1955": {"pb": 60.35, "si": 1619.68, "pv": 38.6}, "1956": {"pb": 72.88, "si": 1754.79, "pv": 46.65}, "1957": {"pb": 58.43, "si": 1703.86, "pv": 37.4}, "1958": {"pb": 94.79, "si": 1822.93, "pv": 67.24}, "1959": {"pb": 56.49, "si": 1356.71, "pv": 45.49}, "1960": {"pb": 52.38, "si": 1385.93, "pv": 39.27}, "1961": {"pb": 55.28, "si": 1542.23, "pv": 34.6}, "1962": {"pb": 55.55, "si": 1507.45, "pv": 34.39}, "1963": {"pb": 54.48, "si": 1541.27, "pv": 30.5}, "1964": {"pb": 50.84, "si": 1705.33, "pv": 34.05}, "1965": {"pb": 56.13, "si": 1844.7, "pv": 42.36}, "1966": {"pb": 55.41, "si": 1864.95, "pv": 45.51}, "1967": {"pb": 53.19, "si": 1864.07, "pv": 43.98}, "1968": {"pb": 45.76, "si": 1725.44, "pv": 37.84}, "1969": {"pb": 47.61, "si": 1770.14, "pv": 44.48}, "1970": {"pb": 43.75, "si": 1830.58, "pv": 39.55}, "1971": {"pb": 49.13, "si": 1905.75, "pv": 53.6}, "1972": {"pb": 43.29, "si": 1771.24, "pv": 49.23}, "1973": {"pb": 35.43, "si": 1909.02, "pv": 64.09}, "1974": {"pb": 35.21, "si": 2112.43, "pv": 60.52}, "1975": {"pb": 45.35, "si": 2029.9, "pv": 30.6}, "1976": {"pb": 34.28, "si": 1329.65, "pv": 25.76}, "1977": {"pb": 23.69, "si": 1268.59, "pv": 18.9}, "1978": {"pb": 16.87, "si": 1242.79, "pv": 15.01}, "1979": {"pb": 15.68, "si": 1448.81, "pv": 10.62}, "1980": {"pb": 18.68, "si": 1605.74, "pv": 16.71}, "1981": {"pb": 18.49, "si": 1440.39, "pv": 17.19}, "1982": {"pb": 19.53, "si": 1288.95, "pv": 21.43}, "1983": {"pb": 31.44, "si": 1667.69, "pv": 29.51}, "1984": {"pb": 37.41, "si": 2028.12, "pv": 33.52}, "1985": {"pb": 32.36, "si": 1651.71, "pv": 28.6}, "1986": {"pb": 32.51, "si": 1731.18, "pv": 24.88}};
+
+const YEARS = Object.keys(RAW_DATA).map(Number).sort((a,b)=>a-b);
+const N = YEARS.length;
+
+// ── ESTADO ───────────────────────────────────────────────────────────────────
+let currentIdx = 0;
+let playing = false;
+let interval = null;
+let speed = 1;
+let visible = { pb: true, pv: true, si: true };
+
+const COLORS = { pb: '#C0392B', pv: '#27AE60', si: '#2980B9' };
+const Y1_MAX = 120;
+const Y2_MAX = 2400;
+
+// ── CANVAS ───────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+
+function dpr() { return window.devicePixelRatio || 1; }
+
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const w = rect.width - 40;
+  const h = 380;
+  canvas.width = w * dpr();
+  canvas.height = h * dpr();
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.scale(dpr(), dpr());
+  draw();
+}
+window.addEventListener('resize', resize);
+
+// ── LAYOUT ───────────────────────────────────────────────────────────────────
+function getLayout() {
+  const W = canvas.width / dpr();
+  const H = canvas.height / dpr();
+  return {
+    W, H,
+    left:   62,
+    right:  W - 68,
+    top:    20,
+    bottom: H - 36,
+  };
+}
+
+function toX(year, l) {
+  return l.left + (year - 1893) / (1988 - 1893) * (l.right - l.left);
+}
+function toY1(val, l) {
+  return l.bottom - (val / Y1_MAX) * (l.bottom - l.top);
+}
+function toY2(val, l) {
+  return l.bottom - (val / Y2_MAX) * (l.bottom - l.top);
+}
+
+// ── DRAW ─────────────────────────────────────────────────────────────────────
+function draw() {
+  const l = getLayout();
+  ctx.clearRect(0, 0, l.W, l.H);
+
+  // Grid & axes
+  ctx.strokeStyle = '#e8e8e8';
+  ctx.lineWidth = 1;
+  const y1Ticks = [0, 20, 40, 60, 80, 100, 120];
+  y1Ticks.forEach(v => {
+    const y = toY1(v, l);
+    ctx.beginPath(); ctx.moveTo(l.left, y); ctx.lineTo(l.right, y); ctx.stroke();
+    ctx.fillStyle = '#999';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(v, l.left - 6, y + 3.5);
+  });
+  const y2Ticks = [0, 400, 800, 1200, 1600, 2000, 2400];
+  y2Ticks.forEach(v => {
+    const y = toY2(v, l);
+    ctx.fillStyle = '#2980B9';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(v, l.right + 6, y + 3.5);
+  });
+
+  // X ticks
+  const xTicks = [1895,1910,1920,1930,1940,1950,1960,1970,1980,1986];
+  xTicks.forEach(yr => {
+    const x = toX(yr, l);
+    ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, l.top); ctx.lineTo(x, l.bottom); ctx.stroke();
+    ctx.fillStyle = '#999'; ctx.font = '10px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(yr, x, l.bottom + 14);
+  });
+
+  // Axis borders
+  ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(l.left, l.top); ctx.lineTo(l.left, l.bottom); ctx.lineTo(l.right, l.bottom); ctx.stroke();
+
+  // Axis labels
+  ctx.save(); ctx.translate(16, (l.top + l.bottom) / 2); ctx.rotate(-Math.PI/2);
+  ctx.fillStyle = '#C0392B'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('$ ley 18188 (1960)', 0, 0); ctx.restore();
+
+  ctx.save(); ctx.translate(l.W - 12, (l.top + l.bottom) / 2); ctx.rotate(Math.PI/2);
+  ctx.fillStyle = '#2980B9'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('$ de 2004 (Ferreres)', 0, 0); ctx.restore();
+
+  // ── SERIES ────────────────────────────────────────────────────────────────
+  const visYears = YEARS.slice(0, currentIdx + 1);
+
+  function drawSeries(key, toY, dash) {
+    if (!visible[key]) return;
+    ctx.strokeStyle = COLORS[key];
+    ctx.lineWidth = 2.2;
+    if (dash) ctx.setLineDash([7,4]); else ctx.setLineDash([]);
+
+    let segments = [];
+    let seg = [];
+    visYears.forEach(yr => {
+      const val = RAW_DATA[yr][key];
+      if (val !== null) {
+        seg.push({ x: toX(yr, l), y: toY(val, l) });
+      } else {
+        if (seg.length) { segments.push(seg); seg = []; }
+      }
+    });
+    if (seg.length) segments.push(seg);
+
+    segments.forEach(s => {
+      ctx.beginPath();
+      s.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+
+    // Dots
+    visYears.forEach(yr => {
+      const val = RAW_DATA[yr][key];
+      if (val !== null) {
+        ctx.beginPath();
+        ctx.arc(toX(yr, l), toY(val, l), 3.5, 0, 2*Math.PI);
+        ctx.fillStyle = COLORS[key];
+        ctx.fill();
+      }
+    });
+  }
+
+  drawSeries('pb', v => toY1(v, l), false);
+  drawSeries('pv', v => toY1(v, l), false);
+  drawSeries('si', v => toY2(v, l), true);
+
+  // Year label on chart
+  ctx.fillStyle = 'rgba(26,26,46,0.12)';
+  ctx.font = 'bold 36px Georgia, serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(String(YEARS[currentIdx]), l.right - 8, l.bottom - 10);
+}
+
+// ── ANIMATION ────────────────────────────────────────────────────────────────
+function setIdx(i) {
+  currentIdx = Math.max(0, Math.min(N-1, i));
+  document.getElementById('slider').value = currentIdx;
+  document.getElementById('yearLabel').textContent = YEARS[currentIdx];
+  draw();
+}
+
+function playPause() {
+  if (playing) {
+    clearInterval(interval);
+    playing = false;
+    document.getElementById('btnPlay').textContent = '▶ Reproducir';
+    document.getElementById('btnPlay').classList.remove('active');
+  } else {
+    if (currentIdx >= N - 1) setIdx(0);
+    playing = true;
+    document.getElementById('btnPlay').textContent = '⏸ Pausar';
+    document.getElementById('btnPlay').classList.add('active');
+    const ms = 260 / speed;
+    interval = setInterval(() => {
+      if (currentIdx >= N - 1) {
+        clearInterval(interval);
+        playing = false;
+        document.getElementById('btnPlay').textContent = '▶ Reproducir';
+        document.getElementById('btnPlay').classList.remove('active');
+        return;
+      }
+      setIdx(currentIdx + 1);
+    }, ms);
+  }
+}
+
+function setSpeed(s) {
+  speed = s;
+  [1,2,4].forEach(v => {
+    document.getElementById('sp'+v).classList.toggle('active', v === s);
+  });
+  if (playing) { clearInterval(interval); playing = false; playPause(); }
+}
+
+function toggleSeries(key) {
+  visible[key] = !visible[key];
+  document.getElementById('leg-' + key).classList.toggle('faded', !visible[key]);
+  draw();
+}
+
+// ── TOOLTIP ──────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const l = getLayout();
+  if (mx < l.left || mx > l.right) { tooltip.style.display = 'none'; return; }
+
+  const ratio = (mx - l.left) / (l.right - l.left);
+  const hoverYear = Math.round(1893 + ratio * (1988 - 1893));
+  const nearest = YEARS.slice(0, currentIdx+1).reduce((a,b) =>
+    Math.abs(b - hoverYear) < Math.abs(a - hoverYear) ? b : a, YEARS[0]);
+
+  const d = RAW_DATA[nearest];
+  let html = `<strong>${nearest}</strong><br>`;
+  if (visible.pb) html += d.pb !== null ? `<span style="color:#C0392B">● Peón de bodega:</span> ${d.pb.toFixed(1)} $ ley 18188<br>` : '';
+  if (visible.pv) html += d.pv !== null ? `<span style="color:#27AE60">● Peón de viña:</span> ${d.pv.toFixed(1)} $ ley 18188<br>` : '';
+  if (visible.si) html += d.si !== null ? `<span style="color:#2980B9">● Sal. industrial:</span> ${d.si.toFixed(0)} $ de 2004<br>` : '';
+
+  tooltip.innerHTML = html;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top  = (e.clientY - 10) + 'px';
+});
+canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+
+// ── EVENTS ───────────────────────────────────────────────────────────────────
+document.getElementById('btnPlay').onclick = playPause;
+document.getElementById('btnReset').onclick = () => {
+  if (playing) playPause();
+  setIdx(0);
+};
+document.getElementById('sp1').onclick = () => setSpeed(1);
+document.getElementById('sp2').onclick = () => setSpeed(2);
+document.getElementById('sp4').onclick = () => setSpeed(4);
+document.getElementById('slider').oninput = e => {
+  if (playing) playPause();
+  setIdx(+e.target.value);
+};
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+resize();
+</script>
+</body>
+</html>
