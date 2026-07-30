@@ -118,6 +118,19 @@
   }
   .legend-item.faded { opacity: 0.35; }
 
+  .period-legend {
+    margin-top: 4px;
+    padding-top: 10px;
+    border-top: 1px dashed #e5e5e5;
+  }
+  .period-legend .legend-item { cursor: default; }
+  .period-legend .swatch {
+    width: 16px;
+    height: 11px;
+    border-radius: 2px;
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+
   /* Tooltip */
   .tooltip {
     position: fixed;
@@ -188,6 +201,21 @@
   </div>
 </div>
 
+<div class="legend period-legend">
+  <div class="legend-item">
+    <div class="swatch" style="background:rgba(41,128,185,0.16);"></div>
+    1890–1960
+  </div>
+  <div class="legend-item">
+    <div class="swatch" style="background:rgba(230,126,34,0.20);"></div>
+    1960–1970
+  </div>
+  <div class="legend-item">
+    <div class="swatch" style="background:rgba(142,68,173,0.16);"></div>
+    1970–1986
+  </div>
+</div>
+
 <p class="sources">
   Fuentes: Salarios varones y mujeres 1895–1986 (Olguín, JHE 2025) · Salario industrial, base Ferreres.
 </p>
@@ -203,6 +231,13 @@ const N = YEARS.length;
 
 // Divisiones de período (líneas verticales de fondo)
 const PERIOD_LINES = [1960, 1970];
+
+// Sombreado de etapas: colores claros, uno por etapa, solo de fondo
+const PERIODS = [
+  { from: 1893, to: 1960, color: 'rgba(41, 128, 185, 0.055)' },  // 1890–1960
+  { from: 1960, to: 1970, color: 'rgba(230, 126, 34, 0.09)' },   // 1960–1970
+  { from: 1970, to: 1988, color: 'rgba(142, 68, 173, 0.065)' }   // 1970–1986
+];
 
 // ── ESTADO ───────────────────────────────────────────────────────────────────
 let currentIdx = 0;
@@ -261,6 +296,14 @@ function toY2(val, l) {
 function draw() {
   const l = getLayout();
   ctx.clearRect(0, 0, l.W, l.H);
+
+  // Sombreado de etapas (fondo, colores claros y diferenciados)
+  PERIODS.forEach(p => {
+    const x1 = toX(p.from, l);
+    const x2 = toX(p.to, l);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(x1, l.top, x2 - x1, l.bottom - l.top);
+  });
 
   // Divisiones de período (líneas verticales de fondo)
   PERIOD_LINES.forEach(yr => {
