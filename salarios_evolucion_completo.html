@@ -439,7 +439,7 @@ canvas.addEventListener('mousemove', e => {
   if (mx < l.left || mx > l.right) { tooltip.style.display = 'none'; return; }
 
   const ratio = (mx - l.left) / (l.right - l.left);
-  const hoverYear = Math.round(1893 + ratio * (1988 - 1893));
+  const hoverYear = Math.round(1914 + ratio * (1988 - 1914));
   const nearest = YEARS.slice(0, currentIdx+1).reduce((a,b) =>
     Math.abs(b - hoverYear) < Math.abs(a - hoverYear) ? b : a, YEARS[0]);
 
