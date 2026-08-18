@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evolución del PBG de Mendoza, 1970–2022</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #ffffff;
+    color: #222;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.4rem;
+    font-weight: normal;
+    color: #1B2A4A;
+    text-align: center;
+    margin-bottom: 4px;
+    line-height: 1.35;
+  }
+  h2 {
+    font-family: Arial, sans-serif;
+    font-size: 0.85rem;
+    font-weight: normal;
+    color: #999;
+    text-align: center;
+    margin-bottom: 18px;
+    max-width: 620px;
+  }
+  .chart-wrap {
+    width: 100%;
+    max-width: 900px;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    padding: 20px 20px 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  canvas { display: block; width: 100% !important; }
+
+  .controls {
+    width: 100%;
+    max-width: 900px;
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .btn-row { display: flex; gap: 10px; align-items: center; }
+  button {
+    padding: 8px 20px;
+    border: 1.5px solid #bbb;
+    border-radius: 4px;
+    background: #fff;
+    font-family: Arial, sans-serif;
+    font-size: 0.88rem;
+    cursor: pointer;
+    color: #333;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  button:hover { background: #f0f0f0; border-color: #999; }
+  button.active { background: #1B2A4A; color: #fff; border-color: #1B2A4A; }
+  .speed-label { font-size: 0.82rem; color: #888; margin-left: 8px; }
+  .slider-row { display: flex; align-items: center; gap: 12px; }
+  .slider-row label { font-size: 0.85rem; color: #555; white-space: nowrap; min-width: 52px; }
+  input[type=range] { flex: 1; accent-color: #1B2A4A; height: 4px; cursor: pointer; }
+  .year-display {
+    font-family: Georgia, serif;
+    font-size: 1.05rem;
+    font-weight: bold;
+    color: #1B2A4A;
+    min-width: 44px;
+    text-align: right;
+  }
+
+  .legend {
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 14px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.82rem;
+    color: #444;
+  }
+  .legend-item .swatch {
+    width: 26px; height: 3px; border-radius: 2px; flex-shrink: 0; background: currentColor;
+  }
+
+  .sources {
+    margin-top: 16px;
+    font-size: 0.72rem;
+    color: #aaa;
+    text-align: center;
+    max-width: 900px;
+    line-height: 1.5;
+  }
+
+  .tooltip {
+    position: fixed;
+    background: rgba(255,255,255,0.97);
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 9px 13px;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    pointer-events: none;
+    display: none;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+    z-index: 999;
+    min-width: 190px;
+  }
+  .tooltip strong { font-family: Georgia, serif; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+
+<h1>Evolución del PBG de Mendoza, 1970–2022</h1>
+<h2>Dos tramos NO comparables en nivel — distinto año base, sin año de solapamiento entre 1985 y 1986</h2>
+
+<div class="chart-wrap">
+  <canvas id="chart" height="400"></canvas>
+</div>
+
+<div class="controls">
+  <div class="btn-row">
+    <button id="btnPlay" class="active">▶ Reproducir</button>
+    <button id="btnReset">⟳ Reiniciar</button>
+    <span class="speed-label">Velocidad:</span>
+    <button id="sp1" class="active">1×</button>
+    <button id="sp2">2×</button>
+  </div>
+  <div class="slider-row">
+    <label>Año:</label>
+    <input type="range" id="slider" min="0" max="52" step="1" value="0">
+    <span class="year-display" id="yearLabel">1970</span>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="swatch" style="color:#C0392B;"></div>1970–1985 (índice, 1970=100)</div>
+  <div class="legend-item"><div class="swatch" style="color:#1B2A4A;"></div>1986–2022 (miles de $ ctes. de 1999)</div>
+</div>
+
+<p class="sources">
+  Fuente: elaboración propia en base a DEIE Mendoza (PBG 1970–2022) e IPC INDEC (base 1999=100).<br>
+  1970-1985: índice propio, sin convertir a pesos (no hay año de solapamiento con el tramo siguiente).
+  1986-2022: empalme por variación con años de solapamiento reales (1991-1993), a precios de 1999.
+</p>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ── DATOS ────────────────────────────────────────────────────────────────────
+const DATA_A = {"1970":100.0,"1971":106.6937,"1972":113.6649,"1973":116.2397,"1974":129.6526,"1975":113.3267,"1976":128.9124,"1977":121.4402,"1978":135.1498,"1979":153.4792,"1980":136.9492,"1981":112.2515,"1982":114.9954,"1983":133.7651,"1984":129.0368,"1985":122.71};   // 1970-1985, índice 1970=100
+const DATA_B = {"1986":7564850.34,"1987":7662186.67,"1988":7476209.35,"1989":7163476.84,"1990":7169611.07,"1991":7014604.44,"1992":7608953.65,"1993":8394703.84,"1994":8758677.75,"1995":8554024.22,"1996":8799057.04,"1997":9632521.13,"1998":10262365.51,"1999":10007457.55,"2000":9736438.41,"2001":9001995.93,"2002":8406265.75,"2003":10101895.22,"2004":11762122.31,"2005":12309223.36,"2006":13259436.59,"2007":13812573.22,"2008":14131050.69,"2009":13736909.13,"2010":14344401.02,"2011":14860479.79,"2012":14650114.28,"2013":15370910.46,"2014":14804605.69,"2015":15347103.83,"2016":14463992.61,"2017":14769528.2,"2018":14693941.88,"2019":14504929.05,"2020":13349577.66,"2021":14748324.05,"2022":15335413.85};   // 1986-2022, miles de $ ctes. de 1999
+
+const YEARS_A = Object.keys(DATA_A).map(Number).sort((a,b)=>a-b);
+const YEARS_B = Object.keys(DATA_B).map(Number).sort((a,b)=>a-b);
+const YEARS = YEARS_A.concat(YEARS_B);
+const N = YEARS.length;
+
+const Y0 = YEARS[0], Y1 = YEARS[YEARS.length - 1];
+
+const A_MIN = 95, A_MAX = 160;
+const B_MIN = 6000000, B_MAX = 16000000;
+
+const COLOR_A = '#C0392B';
+const COLOR_B = '#1B2A4A';
+
+let currentIdx = 0;
+let playing = false;
+let interval = null;
+let speed = 1;
+
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+function dpr() { return window.devicePixelRatio || 1; }
+
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const w = rect.width - 40;
+  const h = 400;
+  canvas.width = w * dpr();
+  canvas.height = h * dpr();
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.scale(dpr(), dpr());
+  draw();
+}
+window.addEventListener('resize', resize);
+
+function getLayout() {
+  const W = canvas.width / dpr();
+  const H = canvas.height / dpr();
+  return { W, H, left: 64, right: W - 64, top: 24, bottom: H - 40 };
+}
+
+function toX(year, l) { return l.left + (year - Y0) / (Y1 - Y0) * (l.right - l.left); }
+function toYA(val, l) { return l.bottom - (val - A_MIN) / (A_MAX - A_MIN) * (l.bottom - l.top); }
+function toYB(val, l) { return l.bottom - (val - B_MIN) / (B_MAX - B_MIN) * (l.bottom - l.top); }
+function fmtM(v) { return (v/1e6).toFixed(0) + 'M'; }
+
+function draw() {
+  const l = getLayout();
+  ctx.clearRect(0, 0, l.W, l.H);
+
+  const xGap1 = toX(1985, l), xGap2 = toX(1986, l);
+  ctx.fillStyle = 'rgba(31,138,140,0.07)';
+  ctx.fillRect(xGap1, l.top, xGap2 - xGap1, l.bottom - l.top);
+  ctx.strokeStyle = '#bbb'; ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo((xGap1+xGap2)/2, l.top); ctx.lineTo((xGap1+xGap2)/2, l.bottom); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const aTicks = [100, 120, 140, 160];
+  aTicks.forEach(v => {
+    const y = toYA(v, l);
+    ctx.fillStyle = COLOR_A; ctx.font = '10px Arial'; ctx.textAlign = 'right';
+    ctx.fillText(v, l.left - 8, y + 3.5);
+  });
+  ctx.save(); ctx.translate(16, (l.top+l.bottom)/2); ctx.rotate(-Math.PI/2);
+  ctx.fillStyle = COLOR_A; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('Índice 1970-1985 (1970=100)', 0, 0); ctx.restore();
+
+  const bTicks = [6,8,10,12,14,16].map(v=>v*1e6);
+  bTicks.forEach(v => {
+    const y = toYB(v, l);
+    ctx.fillStyle = COLOR_B; ctx.font = '10px Arial'; ctx.textAlign = 'left';
+    ctx.fillText(fmtM(v), l.right + 8, y + 3.5);
+    ctx.strokeStyle = '#eee'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(l.left, y); ctx.lineTo(l.right, y); ctx.stroke();
+  });
+  ctx.save(); ctx.translate(l.W - 14, (l.top+l.bottom)/2); ctx.rotate(Math.PI/2);
+  ctx.fillStyle = COLOR_B; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('Miles de $ ctes. de 1999 (1986-2022)', 0, 0); ctx.restore();
+
+  const xTicks = [1970,1975,1980,1985,1990,1995,2000,2005,2010,2015,2022];
+  xTicks.forEach(yr => {
+    const x = toX(yr, l);
+    ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, l.bottom); ctx.lineTo(x, l.bottom+4); ctx.stroke();
+    ctx.fillStyle = '#999'; ctx.font = '10px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(yr, x, l.bottom+14);
+  });
+
+  ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(l.left, l.top); ctx.lineTo(l.left, l.bottom); ctx.lineTo(l.right, l.bottom); ctx.stroke();
+
+  const visYears = YEARS.slice(0, currentIdx + 1);
+  const visA = visYears.filter(y => y <= 1985);
+  const visB = visYears.filter(y => y >= 1986);
+
+  if (visA.length) {
+    ctx.strokeStyle = COLOR_A; ctx.lineWidth = 2.3; ctx.beginPath();
+    visA.forEach((yr,i) => { const x=toX(yr,l), y=toYA(DATA_A[yr],l); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+    ctx.stroke();
+    const lastA = visA[visA.length-1];
+    ctx.fillStyle = COLOR_A; ctx.beginPath(); ctx.arc(toX(lastA,l), toYA(DATA_A[lastA],l), 3.5, 0, Math.PI*2); ctx.fill();
+  }
+  if (visB.length) {
+    ctx.strokeStyle = COLOR_B; ctx.lineWidth = 2.3; ctx.beginPath();
+    visB.forEach((yr,i) => { const x=toX(yr,l), y=toYB(DATA_B[yr],l); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+    ctx.stroke();
+    const lastB = visB[visB.length-1];
+    ctx.fillStyle = COLOR_B; ctx.beginPath(); ctx.arc(toX(lastB,l), toYB(DATA_B[lastB],l), 3.5, 0, Math.PI*2); ctx.fill();
+  }
+
+  const lastYr = visYears[visYears.length - 1];
+  ctx.fillStyle = 'rgba(27,42,74,0.12)';
+  ctx.font = 'bold 34px Georgia, serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(String(lastYr), l.right - 8, l.bottom - 10);
+}
+
+function setIdx(i) {
+  currentIdx = Math.max(0, Math.min(N-1, i));
+  document.getElementById('slider').value = currentIdx;
+  document.getElementById('yearLabel').textContent = YEARS[currentIdx];
+  draw();
+}
+
+function playPause() {
+  if (playing) {
+    clearInterval(interval); playing = false;
+    document.getElementById('btnPlay').textContent = '▶ Reproducir';
+    document.getElementById('btnPlay').classList.remove('active');
+  } else {
+    if (currentIdx >= N - 1) setIdx(0);
+    playing = true;
+    document.getElementById('btnPlay').textContent = '⏸ Pausar';
+    document.getElementById('btnPlay').classList.add('active');
+    const ms = 120 / speed;
+    interval = setInterval(() => {
+      if (currentIdx >= N - 1) {
+        clearInterval(interval); playing = false;
+        document.getElementById('btnPlay').textContent = '▶ Reproducir';
+        document.getElementById('btnPlay').classList.remove('active');
+        return;
+      }
+      setIdx(currentIdx + 1);
+    }, ms);
+  }
+}
+
+function setSpeed(s) {
+  speed = s;
+  [1,2].forEach(v => document.getElementById('sp'+v).classList.toggle('active', v === s));
+  if (playing) { clearInterval(interval); playing = false; playPause(); }
+}
+
+const tooltip = document.getElementById('tooltip');
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const l = getLayout();
+  if (mx < l.left || mx > l.right) { tooltip.style.display = 'none'; return; }
+
+  const ratio = (mx - l.left) / (l.right - l.left);
+  const hoverYear = Math.round(Y0 + ratio * (Y1 - Y0));
+  const visYears = YEARS.slice(0, currentIdx+1);
+  const nearest = visYears.reduce((a,b) => Math.abs(b-hoverYear) < Math.abs(a-hoverYear) ? b : a, visYears[0]);
+
+  let html = `<strong>${nearest}</strong><br>`;
+  if (nearest <= 1985) {
+    html += `<span style="color:${COLOR_A}">● Índice:</span> ${DATA_A[nearest].toFixed(1)} (1970=100)`;
+  } else {
+    html += `<span style="color:${COLOR_B}">● PBG:</span> ${DATA_B[nearest].toLocaleString('es-AR',{maximumFractionDigits:0})} miles de $ (1999)`;
+  }
+  tooltip.innerHTML = html;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top  = (e.clientY - 10) + 'px';
+});
+canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+
+document.getElementById('btnPlay').onclick = playPause;
+document.getElementById('btnReset').onclick = () => { if (playing) playPause(); setIdx(0); };
+document.getElementById('sp1').onclick = () => setSpeed(1);
+document.getElementById('sp2').onclick = () => setSpeed(2);
+document.getElementById('slider').oninput = e => { if (playing) playPause(); setIdx(+e.target.value); };
+document.getElementById('slider').max = N - 1;
+
+resize();
+</script>
+</body>
+</html>
